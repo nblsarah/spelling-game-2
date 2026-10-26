@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petualangan Kata - Belajar & Kuis Ejaan</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #a8edd9 0%, #fed6e3 100%);
+            min-height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-playful {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        .tile-bounce {
+            animation: bounce 0.4s ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .shake {
+            animation: shake 0.5s linear;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        .pulse-slow {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-3 md:p-6 text-gray-800">
+
+    <!-- Header & Mode Switcher -->
+    <header class="w-full max-w-3xl glass rounded-3xl p-4 mb-4 flex flex-wrap items-center justify-between card-shadow border-4 border-white/80 gap-3">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl md:text-4xl">🔤</span>
+            <div>
+                <h1 class="font-playful text-xl md:text-2xl text-purple-600 tracking-wide">Petualangan Kata</h1>
+                <p class="text-xs text-gray-500 font-bold" id="mode-subtitle">📖 Mode Belajar (Kartu Kata)</p>
+            </div>
+        </div>
+
+        <!-- Stars & Audio Mute -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center bg-amber-100 border-2 border-amber-300 rounded-2xl px-3 py-1.5 shadow-sm">
+                <i class="fa-solid fa-star text-amber-500 text-xl mr-1.5 animate-bounce"></i>
+                <span id="star-count" class="font-playful text-xl text-amber-700">0</span>
+            </div>
+
+            <button id="btn-sound" onclick="toggleMute()" class="w-10 h-10 rounded-2xl bg-indigo-100 border-2 border-indigo-200 flex items-center justify-center text-indigo-600 hover:bg-indigo-200 transition active:scale-95" title="Suara On/Off">
+                <i id="sound-icon" class="fa-solid fa-volume-high text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs (Belajar vs Kuis) -->
+    <nav class="w-full max-w-3xl flex justify-center mb-4">
+        <div class="flex bg-white/70 p-1.5 rounded-2xl gap-2 border-2 border-white shadow-sm w-full max-w-md">
+            <button id="tab-study" onclick="switchMode('study')" class="flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base transition-all shadow-md bg-purple-600 text-white flex items-center justify-center gap-2">
+                📖 <span>Mode Belajar</span>
+            </button>
+            <button id="tab-quiz" onclick="switchMode('quiz')" class="flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base text-purple-700 hover:bg-white/80 transition-all flex items-center justify-center gap-2">
+                🎮 <span>Mode Kuis</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-3xl flex-1 flex flex-col justify-center items-center">
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: MODE BELAJAR (FLASHCARD & STUDY)   -->
+        <!-- ========================================== -->
+        <section id="study-view" class="w-full flex flex-col items-center">
+            
+            <!-- Instructions banner -->
+            <div class="bg-purple-100/90 border border-purple-200 text-purple-800 rounded-2xl px-4 py-2 mb-4 text-xs md:text-sm font-bold text-center shadow-sm">
+                💡 Sentuh setiap huruf untuk mendengarkan bunyinya, atau tekan tombol untuk mengeja kata secara utuh!
+            </div>
+
+            <div class="w-full glass rounded-3xl p-6 md:p-8 card-shadow border-4 border-white flex flex-col items-center relative">
+                
+                <!-- Word Index Badge -->
+                <div class="absolute top-4 left-5 bg-purple-100 text-purple-700 font-bold px-3 py-1 rounded-full text-xs border border-purple-200">
+                    Kata <span id="study-current-idx">1</span> dari <span id="study-total-idx">10</span>
+                </div>
+
+                <!-- Word Emoji Visual -->
+                <div class="mt-4 mb-2 text-center">
+                    <div id="study-emoji" class="text-7xl md:text-9xl my-2 pulse-slow drop-shadow-md cursor-pointer transition transform hover:scale-110" onclick="speakWord(WORD_DATA[studyIndex].word)">
+                        🏺
+                    </div>
+                    <h2 id="study-word-title" class="font-playful text-3xl md:text-4xl text-purple-700 tracking-wider capitalize">
+                        vase
+                    </h2>
+                    <p id="study-translation" class="text-sm font-bold text-gray-500 mt-1">
+                        (Vas Bunga)
+                    </p>
+                    <p id="study-hint" class="text-xs font-semibold text-purple-500 mt-0.5">
+                        "Used to hold flowers"
+                    </p>
+                </div>
+
+                <!-- Interactive Spelling Display (Letter by Letter) -->
+                <div class="my-5 flex flex-wrap justify-center gap-2 md:gap-3" id="study-letters-container">
+                    <!-- Interactive clickable letters built by JS -->
+                </div>
+
+                <!-- Audio Action Controls -->
+                <div class="flex flex-wrap justify-center gap-3 mt-2 w-full max-w-md">
+                    <button onclick="speakWord(WORD_DATA[studyIndex].word)" class="flex-1 flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 py-3 px-4 rounded-2xl font-playful text-sm md:text-base shadow-md transition active:scale-95 border-b-4 border-amber-500">
+                        <i class="fa-solid fa-volume-high"></i>
+                        <span>Dengar Kata</span>
+                    </button>
+                    <button onclick="spellWordOutLoud(WORD_DATA[studyIndex].word)" class="flex-1 flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 py-3 px-4 rounded-2xl font-playful text-sm md:text-base shadow-md transition active:scale-95 border-b-4 border-emerald-500">
+                        <i class="fa-solid fa-spell-check"></i>
+                        <span>Eja Kata</span>
+                    </button>
+                </div>
+
+                <!-- Prev / Next Word Navigation -->
+                <div class="flex justify-between items-center w-full mt-8 pt-4 border-t border-purple-100">
+                    <button onclick="navigateStudy(-1)" class="flex items-center gap-2 bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold px-4 py-2 rounded-2xl transition active:scale-95 border border-purple-300">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Sebelumnya</span>
+                    </button>
+                    <button onclick="navigateStudy(1)" class="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-2xl shadow-md transition active:scale-95">
+                        <span>Berikutnya</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Word Selector Thumbnails -->
+            <div class="w-full mt-4 flex justify-center gap-2 overflow-x-auto pb-2" id="study-thumbnails">
+                <!-- Injected via JS -->
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: MODE KUIS (INTERACTIVE GAME)       -->
+        <!-- ========================================== -->
+        <section id="quiz-view" class="w-full flex flex-col items-center hidden">
+            
+            <!-- Progress Bar -->
+            <div class="w-full max-w-md bg-white/60 h-4 rounded-full mb-4 overflow-hidden border border-white p-0.5 shadow-inner">
+                <div id="quiz-progress-bar" class="bg-gradient-to-r from-emerald-400 to-green-500 h-full rounded-full transition-all duration-500" style="width: 10%;"></div>
+            </div>
+
+            <!-- Quiz Game Card -->
+            <div id="quiz-card" class="w-full glass rounded-3xl p-6 md:p-8 card-shadow border-4 border-white flex flex-col items-center relative">
+                
+                <!-- Word Badge -->
+                <div class="absolute top-4 left-5 bg-purple-100 text-purple-700 font-bold px-3 py-1 rounded-full text-xs border border-purple-200">
+                    Soal <span id="quiz-current-idx">1</span> dari <span id="quiz-total-idx">10</span>
+                </div>
+
+                <!-- Listen Word Button -->
+                <button onclick="speakWord(WORD_DATA[quizIndex].word)" class="absolute top-4 right-5 w-11 h-11 bg-amber-400 hover:bg-amber-300 text-amber-950 rounded-full flex items-center justify-center shadow-md transform hover:scale-110 active:scale-95 transition border-2 border-amber-200" title="Dengar Kata">
+                    <i class="fa-solid fa-volume-high text-xl"></i>
+                </button>
+
+                <!-- Emoji Clue & Hint -->
+                <div class="my-3 text-center">
+                    <div id="quiz-emoji" class="text-7xl md:text-8xl my-2 pulse-slow drop-shadow-md cursor-pointer transform hover:scale-110 transition" onclick="speakWord(WORD_DATA[quizIndex].word)">
+                        🏺
+                    </div>
+                    <p id="quiz-hint-text" class="text-sm font-semibold text-gray-500 mt-1">Susun huruf yang benar!</p>
+                </div>
+
+                <!-- Target Slots Area -->
+                <div id="quiz-letter-slots" class="flex flex-wrap justify-center gap-2 md:gap-3 my-5 min-h-[64px]">
+                    <!-- Target slots dynamically rendered -->
+                </div>
+
+                <!-- Available Letter Bank -->
+                <div class="w-full mt-2">
+                    <p class="text-center text-xs font-bold text-gray-400 mb-3 tracking-wider uppercase">Pilih atau Geser Huruf</p>
+                    <div id="quiz-letter-bank" class="flex flex-wrap justify-center gap-2 md:gap-3 p-2 min-h-[72px]">
+                        <!-- Letter choice tiles dynamically rendered -->
+                    </div>
+                </div>
+
+                <!-- Action Controls: Hint & Reset -->
+                <div class="flex gap-3 mt-6">
+                    <button id="btn-quiz-hint" onclick="useQuizHint()" class="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 px-4 py-2.5 rounded-2xl font-bold text-sm shadow-md transition active:scale-95 border-2 border-amber-300">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        <span>Bantuan (<span id="quiz-hint-count">3</span>)</span>
+                    </button>
+                    <button onclick="resetQuizWord()" class="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-2xl font-bold text-sm shadow-md transition active:scale-95 border-2 border-slate-300">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>Ulangi</span>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Completion Modal -->
+        <div id="celebration-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl p-8 max-w-md w-full text-center card-shadow border-4 border-yellow-300">
+                <div class="text-6xl mb-3">🎉🏆🎉</div>
+                <h2 class="font-playful text-3xl text-purple-600 mb-2">Luar Biasa!</h2>
+                <p class="text-gray-600 font-medium mb-4">Kamu berhasil menyelesaikan kuis ejaan!</p>
+                
+                <div class="bg-yellow-50 rounded-2xl p-4 mb-6 border-2 border-yellow-200 flex justify-around items-center">
+                    <div>
+                        <p class="text-xs text-gray-500 font-bold uppercase">Bintang Disukai</p>
+                        <p class="font-playful text-3xl text-yellow-600" id="final-stars">0</p>
+                    </div>
+                    <div class="h-10 w-0.5 bg-yellow-200"></div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-bold uppercase">Akurasi</p>
+                        <p class="font-playful text-3xl text-emerald-600" id="final-accuracy">100%</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="switchMode('study')" class="flex-1 bg-purple-100 text-purple-700 font-playful py-3.5 px-4 rounded-2xl border-2 border-purple-200 hover:bg-purple-200 transition">
+                        📖 Belajar Lagi
+                    </button>
+                    <button onclick="restartQuiz()" class="flex-1 bg-emerald-500 text-white font-playful py-3.5 px-4 rounded-2xl shadow-lg hover:bg-emerald-600 transition">
+                        🚀 Main Lagi
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-3xl text-center py-3 text-xs text-gray-500 font-bold">
+        Game Belajar Bahasa Inggris Interaktif • 10 Kata Bergambar
+    </footer>
+
+    <!-- Game Logic -->
+    <script>
+        // 10 Target Words Data with Indonesian Hints & Translations
+        const WORD_DATA = [
+            { word: 'vase', emoji: '🏺', hint: 'Wadah untuk menaruh bunga', translation: 'Vas Bunga' },
+            { word: 'fox', emoji: '🦊', hint: 'Hewan liar pemakan daging yang cerdik', translation: 'Rubah' },
+            { word: 'fork', emoji: '🍴', hint: 'Alat makan bergigi untuk menusuk makanan', translation: 'Garpu' },
+            { word: 'van', emoji: '🚐', hint: 'Mobil berukuran sedang untuk mengangkut barang/penumpang', translation: 'Mobil Van' },
+            { word: 'feather', emoji: '🪶', hint: 'Bulu halus yang menutupi tubuh burung', translation: 'Bulu Burung' },
+            { word: 'fire', emoji: '🔥', hint: 'Nyala panas dan terang yang menghasilkan hangat', translation: 'Api' },
+            { word: 'vegetable', emoji: '🥦', hint: 'Makanan sehat yang berasal dari tumbuhan', translation: 'Sayuran' },
+            { word: 'fan', emoji: '🪭', hint: 'Alat penghembus angin agar terasa sejuk', translation: 'Kipas Angin' },
+            { word: 'violin', emoji: '🎻', hint: 'Alat musik gesek berbahan kayu', translation: 'Biola' },
+            { word: 'fish', emoji: '🐟', hint: 'Hewan yang hidup dan berenang di dalam air', translation: 'Ikan' }
+        ];
+
+        // High contrast letter styles: Dark text (#1e293b / slate-900) on soft colorful background tiles
+        const TILE_STYLES = [
+            'bg-amber-300 border-amber-500 text-slate-900',
+            'bg-sky-300 border-sky-500 text-slate-900',
+            'bg-emerald-300 border-emerald-500 text-slate-900',
+            'bg-rose-300 border-rose-500 text-slate-900',
+            'bg-purple-300 border-purple-500 text-slate-900',
+            'bg-teal-300 border-teal-500 text-slate-900',
+            'bg-orange-300 border-orange-500 text-slate-900',
+            'bg-yellow-300 border-yellow-500 text-slate-900'
+        ];
+
+        // Global Game States
+        let currentMode = 'study'; // 'study' or 'quiz'
+        let studyIndex = 0;
+        let quizIndex = 0;
+        let stars = 0;
+        let hintsLeft = 3;
+        let isMuted = false;
+
+        let quizSlots = [];
+        let quizBank = [];
+        let totalAttempts = 0;
+        let correctAttempts = 0;
+
+        // Web Audio API Context
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Play Sound Effects
+        function playSound(type) {
+            if (isMuted) return;
+            initAudio();
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.exponentialRampToValueAtTime(850, now + 0.05);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'pop') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(280, now);
+                osc.frequency.exponentialRampToValueAtTime(650, now + 0.08);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'correct') {
+                [523.25, 659.25, 783.99].forEach((freq, idx) => {
+                    const subOsc = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    subOsc.type = 'sine';
+                    subOsc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    subGain.gain.setValueAtTime(0.2, now + idx * 0.08);
+                    subGain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.25);
+                    subOsc.connect(subGain);
+                    subGain.connect(audioCtx.destination);
+                    subOsc.start(now + idx * 0.08);
+                    subOsc.stop(now + idx * 0.08 + 0.25);
+                });
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'win') {
+                [440, 554.37, 659.25, 880].forEach((freq, i) => {
+                    const subOsc = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    subOsc.type = 'triangle';
+                    subOsc.frequency.setValueAtTime(freq, now + i * 0.12);
+                    subGain.gain.setValueAtTime(0.25, now + i * 0.12);
+                    subGain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.3);
+                    subOsc.connect(subGain);
+                    subGain.connect(audioCtx.destination);
+                    subOsc.start(now + i * 0.12);
+                    subOsc.stop(now + i * 0.12 + 0.3);
+                });
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('sound-icon');
+            if (isMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-lg text-gray-400';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-lg';
+                playSound('click');
+            }
+        }
+
+        // Web Speech API Pronunciation
+        function speakWord(text) {
+            playSound('click');
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.85;
+                utterance.pitch = 1.1;
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Spell Out Loud Letter by Letter
+        function spellWordOutLoud(word) {
+            playSound('click');
+            if (!('speechSynthesis' in window)) return;
+
+            window.speechSynthesis.cancel();
+            
+            // Speak full word first
+            const fullUtterance = new SpeechSynthesisUtterance(word);
+            fullUtterance.rate = 0.85;
+            fullUtterance.lang = 'en-US';
+            window.speechSynthesis.speak(fullUtterance);
+
+            // Spell each letter sequentially
+            const letters = word.split('');
+            letters.forEach((char, idx) => {
+                const charUtterance = new SpeechSynthesisUtterance(char);
+                charUtterance.rate = 0.75;
+                charUtterance.pitch = 1.15;
+                charUtterance.lang = 'en-US';
+                window.speechSynthesis.speak(charUtterance);
+            });
+        }
+
+        // Speak Single Letter (phonics / letter name)
+        function speakLetter(char) {
+            playSound('click');
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(char);
+                utterance.rate = 0.8;
+                utterance.pitch = 1.2;
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Switch Game Mode (Study vs Quiz)
+        function switchMode(mode) {
+            currentMode = mode;
+            playSound('click');
+
+            const tabStudy = document.getElementById('tab-study');
+            const tabQuiz = document.getElementById('tab-quiz');
+            const studyView = document.getElementById('study-view');
+            const quizView = document.getElementById('quiz-view');
+            const modeSubtitle = document.getElementById('mode-subtitle');
+
+            if (mode === 'study') {
+                tabStudy.className = "flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base transition-all shadow-md bg-purple-600 text-white flex items-center justify-center gap-2";
+                tabQuiz.className = "flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base text-purple-700 hover:bg-white/80 transition-all flex items-center justify-center gap-2";
+                studyView.classList.remove('hidden');
+                quizView.classList.add('hidden');
+                modeSubtitle.innerText = "📖 Mode Belajar (Kartu Kata)";
+                loadStudyWord();
+            } else {
+                tabQuiz.className = "flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base transition-all shadow-md bg-purple-600 text-white flex items-center justify-center gap-2";
+                tabStudy.className = "flex-1 py-2.5 px-4 rounded-xl font-playful text-sm md:text-base text-purple-700 hover:bg-white/80 transition-all flex items-center justify-center gap-2";
+                quizView.classList.remove('hidden');
+                studyView.classList.add('hidden');
+                modeSubtitle.innerText = "🎮 Mode Kuis (Tebak Ejaan)";
+                loadQuizWord();
+            }
+        }
+
+        // ==========================================
+        // STUDY MODE LOGIC
+        // ==========================================
+        function loadStudyWord() {
+            const data = WORD_DATA[studyIndex];
+            
+            document.getElementById('study-current-idx').innerText = studyIndex + 1;
+            document.getElementById('study-total-idx').innerText = WORD_DATA.length;
+            document.getElementById('study-emoji').innerText = data.emoji;
+            document.getElementById('study-word-title').innerText = data.word;
+            document.getElementById('study-translation').innerText = `(${data.translation})`;
+            document.getElementById('study-hint').innerText = `"${data.hint}"`;
+
+            // Build Interactive Letter Tiles for Study Mode
+            const lettersContainer = document.getElementById('study-letters-container');
+            lettersContainer.innerHTML = '';
+
+            data.word.split('').forEach((char, idx) => {
+                const colorStyle = TILE_STYLES[idx % TILE_STYLES.length];
+                const letterBtn = document.createElement('button');
+                letterBtn.className = `${colorStyle} w-12 h-14 md:w-16 md:h-18 rounded-2xl flex flex-col items-center justify-center font-playful text-3xl md:text-4xl shadow-md border-b-4 transition transform hover:scale-110 active:scale-95 border-purple-400 select-none`;
+                letterBtn.innerHTML = `<span>${char.toUpperCase()}</span>`;
+                letterBtn.title = `Tekan untuk mendengar huruf ${char.toUpperCase()}`;
+                
+                letterBtn.onclick = () => {
+                    letterBtn.classList.add('tile-bounce');
+                    speakLetter(char);
+                    setTimeout(() => letterBtn.classList.remove('tile-bounce'), 400);
+                };
+
+                lettersContainer.appendChild(letterBtn);
+            });
+
+            // Render Thumbnails Navigation
+            renderStudyThumbnails();
+            
+            // Auto speak word
+            setTimeout(() => speakWord(data.word), 300);
+        }
+
+        function navigateStudy(direction) {
+            studyIndex = (studyIndex + direction + WORD_DATA.length) % WORD_DATA.length;
+            playSound('click');
+            loadStudyWord();
+        }
+
+        function renderStudyThumbnails() {
+            const thumbContainer = document.getElementById('study-thumbnails');
+            thumbContainer.innerHTML = '';
+
+            WORD_DATA.forEach((item, index) => {
+                const thumbBtn = document.createElement('button');
+                const isActive = index === studyIndex;
+                thumbBtn.className = `px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all border ${
+                    isActive ? 'bg-purple-600 text-white border-purple-700 shadow-md scale-105' : 'bg-white/80 text-purple-800 border-white hover:bg-white'
+                }`;
+                thumbBtn.innerHTML = `<span>${item.emoji}</span> <span class="capitalize">${item.word}</span>`;
+                thumbBtn.onclick = () => {
+                    studyIndex = index;
+                    playSound('click');
+                    loadStudyWord();
+                };
+                thumbContainer.appendChild(thumbBtn);
+            });
+        }
+
+
+        // ==========================================
+        // QUIZ MODE LOGIC
+        // ==========================================
+        function loadQuizWord() {
+            const data = WORD_DATA[quizIndex];
+            const word = data.word.toLowerCase();
+
+            document.getElementById('quiz-current-idx').innerText = quizIndex + 1;
+            document.getElementById('quiz-total-idx').innerText = WORD_DATA.length;
+            document.getElementById('quiz-emoji').innerText = data.emoji;
+            document.getElementById('quiz-hint-text').innerText = `Petunjuk: ${data.translation}`;
+
+            // Update Progress Bar
+            const progressPercent = ((quizIndex) / WORD_DATA.length) * 100;
+            document.getElementById('quiz-progress-bar').style.width = `${progressPercent}%`;
+
+            // Auto-speak word sound clue
+            setTimeout(() => speakWord(word), 400);
+
+            // Prepare Slots & Bank
+            quizSlots = new Array(word.length).fill(null);
+
+            // Prepare letter options (target letters + 2 distractors)
+            let lettersArr = word.split('').map((char, id) => ({
+                id: `qorig-${id}`,
+                letter: char,
+                color: TILE_STYLES[Math.floor(Math.random() * TILE_STYLES.length)]
+            }));
+
+            // Distractor letters
+            const alphabet = "abcdefghijklmnopqrstuvwxyz";
+            for (let i = 0; i < 2; i++) {
+                const randomChar = alphabet[Math.floor(Math.random() * alphabet.length)];
+                lettersArr.push({
+                    id: `qextra-${i}-${Date.now()}`,
+                    letter: randomChar,
+                    color: TILE_STYLES[Math.floor(Math.random() * TILE_STYLES.length)]
+                });
+            }
+
+            // Shuffle
+            quizBank = lettersArr.sort(() => Math.random() - 0.5);
+
+            renderQuizBoard();
+        }
+
+        function renderQuizBoard() {
+            const slotsContainer = document.getElementById('quiz-letter-slots');
+            const bankContainer = document.getElementById('quiz-letter-bank');
+
+            slotsContainer.innerHTML = '';
+            bankContainer.innerHTML = '';
+
+            // Render Slots
+            quizSlots.forEach((slot, index) => {
+                const slotDiv = document.createElement('div');
+                
+                if (slot) {
+                    // Filled slot: High contrast dark text on pastel tile background
+                    slotDiv.className = `${slot.color} w-12 h-14 md:w-14 md:h-16 rounded-2xl border-b-4 flex items-center justify-center font-playful text-2xl md:text-3xl transition-all cursor-pointer shadow-md scale-105 active:scale-95`;
+                    slotDiv.innerText = slot.letter.toUpperCase();
+                    slotDiv.onclick = () => returnQuizTileToBank(index);
+                } else {
+                    // Empty slot
+                    slotDiv.className = `w-12 h-14 md:w-14 md:h-16 rounded-2xl border-3 border-dashed border-purple-400 bg-white/70 hover:bg-purple-50 flex items-center justify-center font-playful text-2xl md:text-3xl transition-all cursor-pointer shadow-inner`;
+                    slotDiv.innerHTML = `<span class="text-purple-300 text-lg">_</span>`;
+                }
+
+                // Drag & Drop
+                slotDiv.ondragover = (e) => e.preventDefault();
+                slotDiv.ondrop = (e) => {
+                    e.preventDefault();
+                    const tileId = e.dataTransfer.getData('text/plain');
+                    if (tileId) placeQuizTileInSlot(tileId, index);
+                };
+
+                slotsContainer.appendChild(slotDiv);
+            });
+
+            // Render Letter Bank
+            quizBank.forEach((tile) => {
+                const tileBtn = document.createElement('div');
+                tileBtn.className = `${tile.color} w-12 h-14 md:w-14 md:h-16 rounded-2xl flex items-center justify-center font-playful text-2xl md:text-3xl shadow-lg cursor-pointer transform hover:-translate-y-1 active:translate-y-0 transition border-b-4 select-none tile-bounce font-extrabold`;
+                tileBtn.innerText = tile.letter.toUpperCase();
+                tileBtn.draggable = true;
+
+                tileBtn.onclick = () => {
+                    const emptyIndex = quizSlots.findIndex(s => s === null);
+                    if (emptyIndex !== -1) {
+                        placeQuizTileInSlot(tile.id, emptyIndex);
+                    }
+                };
+
+                tileBtn.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', tile.id);
+                };
+
+                bankContainer.appendChild(tileBtn);
+            });
+        }
+
+        function placeQuizTileInSlot(tileId, slotIndex) {
+            const tileIdx = quizBank.findIndex(t => t.id === tileId);
+            if (tileIdx === -1) return;
+
+            playSound('pop');
+
+            if (quizSlots[slotIndex]) {
+                quizBank.push(quizSlots[slotIndex]);
+            }
+
+            const [selectedTile] = quizBank.splice(tileIdx, 1);
+            quizSlots[slotIndex] = selectedTile;
+
+            renderQuizBoard();
+            checkQuizComplete();
+        }
+
+        function returnQuizTileToBank(slotIndex) {
+            if (!quizSlots[slotIndex]) return;
+
+            playSound('click');
+            const tile = quizSlots[slotIndex];
+            quizSlots[slotIndex] = null;
+            quizBank.push(tile);
+
+            renderQuizBoard();
+        }
+
+        function checkQuizComplete() {
+            if (quizSlots.includes(null)) return;
+
+            totalAttempts++;
+            const currentTarget = WORD_DATA[quizIndex].word.toLowerCase();
+            const userSpelling = quizSlots.map(s => s.letter).join('').toLowerCase();
+
+            if (userSpelling === currentTarget) {
+                correctAttempts++;
+                playSound('correct');
+                stars += 10;
+                document.getElementById('star-count').innerText = stars;
+
+                const card = document.getElementById('quiz-card');
+                card.classList.add('ring-4', 'ring-emerald-400');
+
+                confetti({
+                    particleCount: 40,
+                    spread: 60,
+                    origin: { y: 0.7 }
+                });
+
+                speakWord(currentTarget);
+
+                setTimeout(() => {
+                    card.classList.remove('ring-4', 'ring-emerald-400');
+                    quizIndex++;
+                    if (quizIndex < WORD_DATA.length) {
+                        loadQuizWord();
+                    } else {
+                        showCelebrationModal();
+                    }
+                }, 1200);
+
+            } else {
+                playSound('wrong');
+                const card = document.getElementById('quiz-card');
+                card.classList.add('shake');
+                setTimeout(() => card.classList.remove('shake'), 500);
+            }
+        }
+
+        function useQuizHint() {
+            if (hintsLeft <= 0) return;
+
+            const targetWord = WORD_DATA[quizIndex].word.toLowerCase();
+            let targetSlotIndex = -1;
+
+            for (let i = 0; i < targetWord.length; i++) {
+                if (!quizSlots[i] || quizSlots[i].letter !== targetWord[i]) {
+                    targetSlotIndex = i;
+                    break;
+                }
+            }
+
+            if (targetSlotIndex === -1) return;
+
+            if (quizSlots[targetSlotIndex]) {
+                quizBank.push(quizSlots[targetSlotIndex]);
+                quizSlots[targetSlotIndex] = null;
+            }
+
+            const neededChar = targetWord[targetSlotIndex];
+            const bankIndex = quizBank.findIndex(t => t.letter === neededChar);
+
+            if (bankIndex !== -1) {
+                hintsLeft--;
+                document.getElementById('quiz-hint-count').innerText = hintsLeft;
+                if (hintsLeft === 0) {
+                    document.getElementById('btn-quiz-hint').classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                placeQuizTileInSlot(quizBank[bankIndex].id, targetSlotIndex);
+            } else {
+                speakWord(targetWord);
+            }
+        }
+
+        function resetQuizWord() {
+            playSound('click');
+            loadQuizWord();
+        }
+
+        function showCelebrationModal() {
+            playSound('win');
+            
+            const duration = 2.5 * 1000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            })();
+
+            const accuracy = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 100;
+            document.getElementById('final-stars').innerText = stars;
+            document.getElementById('final-accuracy').innerText = `${accuracy}%`;
+
+            document.getElementById('celebration-modal').classList.remove('hidden');
+        }
+
+        function restartQuiz() {
+            quizIndex = 0;
+            stars = 0;
+            hintsLeft = 3;
+            totalAttempts = 0;
+            correctAttempts = 0;
+
+            document.getElementById('star-count').innerText = '0';
+            document.getElementById('quiz-hint-count').innerText = '3';
+            document.getElementById('btn-quiz-hint').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('celebration-modal').classList.add('hidden');
+
+            switchMode('quiz');
+        }
+
+        // Initialize on Window Load
+        window.onload = () => {
+            loadStudyWord();
+        };
+    </script>
+</body>
+</html>
